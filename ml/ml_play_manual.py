@@ -16,6 +16,7 @@ class MLPlay:
         """
         Generate the command according to the received `scene_info`.
         """
+        # Make the caller to invoke `reset()` for the next round.
         if keyboard is None:
             keyboard = []
         if (scene_info["status"] == "GAME_OVER" or
@@ -56,7 +57,7 @@ class MLPlay:
 
     def save_data_to_pickle(self):
         """
-        將資料儲存到 pickle 檔案
+        將資料儲存到 pickle 檔案 
         """
         filename = "manual_arkanoid_data.pickle"  #  手動操作資料的檔名 (可自訂)
         try:
