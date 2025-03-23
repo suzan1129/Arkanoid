@@ -1,4 +1,6 @@
 import pickle
+import numpy as np  # 導入 numpy
+
 
 def predict_landing_point(scene_info, previous_ball_position):
     """
@@ -52,48 +54,71 @@ class MLPlay:
         Constructor
         """
         print(ai_name)
-        self.data_buffer = []  # 用來暫存蒐集到的資料
         self.previous_ball_position = None #  記錄上一幀球的位置
+        self.model = self.load_model() # [ 嘗試載入模型 ]
+        if self.model:
+            print("機器學習模型載入成功！")
+        else:
+            print("模型載入失敗，將使用預設策略 (預測落點演算法)。")
+
 
     def update(self, scene_info, *args, **kwargs):
         """
         Generate the command according to the received `scene_info`.
         """
-        command = "NONE" # [ 初始化 command 變數，**徹底解決 UnboundLocalError 錯誤** ]
-        predicted_x = None # [ 初始化 predicted_x 變數，程式碼更清晰 ]
+        command = "NONE"  # [ 初始化 command 變數，避免 UnboundLocalError ]
+        predicted_x = None  # [ 初始化 predicted_x 變數，程式碼更清晰 ]
 
         if (scene_info["status"] == "GAME_OVER" or
                 scene_info["status"] == "GAME_PASS"):
-            # 遊戲結束時，儲存資料並返回 "RESET"
-            if scene_info["status"] == "GAME_PASS": # 只記錄成功通關的資料 (可選)
-                self.save_data_to_pickle() # 儲存資料
+            # 遊戲結束時，返回 "RESET" (模型測試版本 **不再儲存資料**)
             return "RESET"
 
         if not scene_info["ball_served"]:
             command = "SERVE_TO_LEFT"  # 自動發球
             predicted_x = None #  發球時不預測落點
         else:
-            #  使用預測落點策略控制平台
-            predicted_x = predict_landing_point(scene_info, self.previous_ball_position)
+            # [ 平台指令預測邏輯 - **模型預測 或 預測落點演算法 (預設策略)** ]
+            if self.model: # [ 如果模型載入成功，使用 **模型預測** 指令 ]
+                # [ 提取特徵 - **與 ml_model_trainer.py 的 preprocess_data 函式保持一致** ]
+                ball_x = scene_info["ball"][0]
+                ball_y = scene_info["ball"][1]
+                platform_x = scene_info["platform"][0]
 
-            if predicted_x is not None: #  成功預測到落點
-                if predicted_x < scene_info["platform"][0] + 20 : # 預測落點在平台左半邊
+                ball_dx = 0  # 預設速度為 0
+                ball_dy = 0
+                if self.previous_ball_position: # 如果不是第一幀
+                    ball_dx = ball_x - self.previous_ball_position[0] # 計算 x 軸速度
+                    ball_dy = ball_y - self.previous_ball_position[1] # 計算 y 軸速度
+
+                feature = np.array([ball_x, ball_y, platform_x, ball_dx, ball_dy]).reshape(1, -1) #  [ 特徵順序 **必須與訓練時一致** ]
+                predicted_label = self.model.predict(feature)[0] # [ 模型預測標籤 (0, 1, 或 2) ]
+
+                if predicted_label == 0: # [ 標籤 0: MOVE_LEFT ]
                     command = "MOVE_LEFT"
-                elif predicted_x > scene_info["platform"][0] + 20: # 預測落點在平台右半邊
+                elif predicted_label == 1: # [ 標籤 1: MOVE_RIGHT ]
                     command = "MOVE_RIGHT"
-                else: # 預測落點在平台中間
+                elif predicted_label == 2: # [ 標籤 2: NONE ]
                     command = "NONE"
-            else: # 無法預測落點 (例如球向上移動)，暫時不移動平台
-                command = "NONE"
+                else: # [ 預防模型預測出非預期的標籤 ]
+                    command = "NONE"
+                predicted_x = predict_landing_point(scene_info, self.previous_ball_position) # [ 仍然計算預測落點 (僅用於記錄) ]
+                print(f"[Model Predict] Ball: {scene_info['ball']}, Platform: {scene_info['platform']}, Predicted_x: {predicted_x}, Command: {command}, Label: {predicted_label}") # [ 模型預測時的除錯訊息 ]
 
-        # **[ 資料蒐集程式碼 -  **移動到 `GAME_PASS` 條件判斷內部**，確保只記錄成功資料！]**
-        if scene_info["status"] == "GAME_PASS": # **[ NEW: 只有在遊戲通關時才蒐集資料！]**
-            if scene_info["ball_served"]: #  只在發球後才開始記錄資料 (可選)
-                self.data_buffer.append({
-                    "scene_info": scene_info,
-                    "command": command,
-                    "predicted_x": predicted_x #  記錄預測的落點 x 座標 (方便分析)
-                })
+
+            else: # [ 模型載入失敗，回退到 **預測落點演算法** 作為預設策略 ]
+                predicted_x = predict_landing_point(scene_info, self.previous_ball_position) # [ 預測落點 ]
+                if predicted_x is not None: # [ 成功預測到落點 ]
+                    if predicted_x < scene_info["platform"][0] + 20 : # [ 預測落點在平台左半邊 ]
+                        command = "MOVE_LEFT"
+                    elif predicted_x > scene_info["platform"][0] + 20: # [ 預測落點在平台右半邊 ]
+                        command = "MOVE_RIGHT"
+                    else: # [ 預測落點在平台中間 ]
+                        command = "NONE"
+                else: # [ 無法預測落點 (例如球向上移動)，暫時不移動平台 ]
+                    command = "NONE"
+                print(f"[Fallback Algo] Ball: {scene_info['ball']}, Platform: {scene_info['platform']}, Predicted_x: {predicted_x}, Command: {command}") # [ 預設演算法的除錯訊息 ]
+
 
         self.previous_ball_position = scene_info["ball"] # 更新上一幀球的位置
         return command
@@ -103,17 +128,21 @@ class MLPlay:
         Reset the status
         """
         self.ball_served = False
-        self.data_buffer = [] # 清空資料 buffer
         self.previous_ball_position = None #  重置上一幀球的位置
 
-    def save_data_to_pickle(self):
+
+    def load_model(self, filename="arkanoid_model.pickle"):
         """
-        將資料儲存到 pickle 檔案
+        載入訓練好的機器學習模型
         """
-        filename = "arkanoid_data.pickle" #  你可以自訂檔名
         try:
-            with open(filename, "wb") as f:
-                pickle.dump(self.data_buffer, f)
-            print(f"Data saved to {filename}")
+            with open(filename, "rb") as f:
+                model = pickle.load(f)
+            return model
+        except FileNotFoundError:
+            print(f"模型檔案 '{filename}' 未找到，將使用預設策略 (預測落點演算法)。") # [ 修改：更明確的提示訊息 ]
+            return None
         except Exception as e:
-            print(f"Error saving data: {e}")
+            print(f"模型載入失敗: {e}")
+            print(f"將使用預設策略 (預測落點演算法)。") # [ 新增：更明確的提示訊息 ]
+            return None
