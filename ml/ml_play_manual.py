@@ -16,6 +16,7 @@ class MLPlay:
         """
         Generate the command according to the received `scene_info`.
         """
+        command = "NONE"  #  [ **修正： 在函式一開始 **初始化** `command` 變數，預設值為 "NONE" ]
         # Make the caller to invoke `reset()` for the next round.
         if keyboard is None:
             keyboard = []
@@ -57,7 +58,7 @@ class MLPlay:
 
     def save_data_to_pickle(self):
         """
-        將資料儲存到 pickle 檔案 
+        將資料儲存到 pickle 檔案
         """
         filename = "manual_arkanoid_data.pickle"  #  手動操作資料的檔名 (可自訂)
         try:
