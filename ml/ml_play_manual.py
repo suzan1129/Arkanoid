@@ -1,8 +1,10 @@
 """
-The template of the main script of the machine learning process (Manual Control with Data Collection)
+The template of the main script of the manual machine learning process
 """
 import pygame
-import pickle  # 導入 pickle 模組
+import pickle
+import datetime
+import os
 
 class MLPlay:
     def __init__(self, ai_name, *args, **kwargs):
@@ -16,15 +18,16 @@ class MLPlay:
         """
         Generate the command according to the received `scene_info`.
         """
-        command = "NONE"  #  [ **修正： 在函式一開始 **初始化** `command` 變數，預設值為 "NONE" ]
-        # Make the caller to invoke `reset()` for the next round.
         if keyboard is None:
             keyboard = []
         if (scene_info["status"] == "GAME_OVER" or
                 scene_info["status"] == "GAME_PASS"):
-            # 遊戲結束時，儲存資料並返回 "RESET"
-            if scene_info["status"] == "GAME_PASS":  # 可選：只記錄成功通關的資料
-                self.save_data_to_pickle()  # 儲存資料
+            if scene_info["status"] == "GAME_PASS":  # 只記錄成功通關的資料
+                folder_name = "manual_arkanoid_data_collection"
+                if not os.path.exists(folder_name):
+                    os.makedirs(folder_name)
+                filename = os.path.join(folder_name, f"manual_arkanoid_data_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pickle")
+                self.save_data_to_pickle(filename)
             return "RESET"
 
         if pygame.K_q in keyboard:
@@ -40,11 +43,17 @@ class MLPlay:
         else:
             command = "NONE"
 
-        # **[ 數據蒐集程式碼 ]**
-        if scene_info["ball_served"]:  # 可選：只在發球後才開始記錄資料
+        # 只在發球後才開始記錄資料
+        if scene_info["ball_served"]:
+            # scene_info.pop("status")  # 移除無法序列化的資料
+            scene_info.pop("bricks")
+            scene_info.pop("hard_bricks")
+            scene_info.pop("frame")
+            scene_info.pop("ball_served")
             self.data_buffer.append({
                 "scene_info": scene_info,
-                "command": command
+                "command": command,
+                "predicted_x": -1  # 手動模式下沒有預測落點，設為 -1
             })
 
         return command
@@ -56,11 +65,17 @@ class MLPlay:
         self.ball_served = False
         self.data_buffer = []  # 清空資料 buffer
 
-    def save_data_to_pickle(self):
+    def save_data_to_pickle(self, filename):
         """
         將資料儲存到 pickle 檔案
         """
-        filename = "manual_arkanoid_data.pickle"  #  手動操作資料的檔名 (可自訂)
+        removed_status_databuffer = []
+        for data in self.data_buffer:
+            data_copy = data.copy()
+            data_copy["scene_info"].pop("status")
+            removed_status_databuffer.append(data_copy)
+        self.data_buffer = removed_status_databuffer
+        print(self.data_buffer)
         try:
             with open(filename, "wb") as f:
                 pickle.dump(self.data_buffer, f)
