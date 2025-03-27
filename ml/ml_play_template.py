@@ -1,7 +1,7 @@
 import pickle
 import numpy as np
 import random
-from ml.ml_play_template import predict_landing_point
+from ml.ml_play_template_collect import predict_landing_point
 
 # def predict_landing_point(scene_info, previous_ball_position):
 #     """
@@ -60,7 +60,7 @@ class MLPlay:
         Generate the command according to the received `scene_info`.
         """
         command = "NONE"
-        predicted_x = None
+        predicted_x = 100
 
         if (scene_info["status"] == "GAME_OVER" or
                 scene_info["status"] == "GAME_PASS"):
@@ -81,21 +81,29 @@ class MLPlay:
                 ball_dy = ball_y - self.previous_ball_position[1]
 
             # 計算 predicted_x
-            # predicted_x = predict_landing_point(scene_info, self.previous_ball_position)
-            # if predicted_x is None:  # 如果無法預測落點
-            #     command = "NONE"  # 停在原地
-            #     predicted_x = platform_x  # 將 predicted_x 設為平台當前位置
-            # else:
-            #     if predicted_x < scene_info["platform"][0] + 20: 
-            #         command = "MOVE_LEFT"
-            #     elif predicted_x > scene_info["platform"][0] + 20:
-            #         command = "MOVE_RIGHT"
-            #     else:
-            #         command = "NONE"
+            predicted_x = predict_landing_point(scene_info, self.previous_ball_position)
+            if predicted_x is None:  # 如果無法預測落點
+                # predicted_x = platform_x  # 將 predicted_x 設為平台當前位置
+                predicted_x = 100   # 將 predicted_x 設為畫面中央
+
+                """
+                ★★★上面這裡是關鍵!!! 就算有模型，也要有 predicted_x 的值
+                因為要將所有的特徵傳給模型，模型才能回傳label給我們
+                才能讓板子判斷要往哪邊移動!!!★★★
+                """
+
             
             if self.model:  # 如果模型載入成功，使用模型預測
                 feature = np.array([ball_x, ball_y, platform_x, ball_dx, ball_dy, predicted_x]).reshape(1, -1)
+
+                """"確認特徵向量"""
+                print("Feature vector:", feature)  # 加入這行，印出特徵向量
+                
+                
+                # print("Debug: 模型預測開始前") # <--- 加入這行
                 predicted_label = self.model.predict(feature)[0]
+                # print("Debug: 模型預測結束後, predicted_label =", predicted_label) # <--- 加入這行
+
 
                 if predicted_label == 0:
                     command = "MOVE_LEFT"
