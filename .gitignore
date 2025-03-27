@@ -11,11 +11,11 @@ venv/*
 .vscode/*
 ml_play*.py
 ml/*
-!ml_play_template.py
+!ml_play_model.py
 !ml_play_manual.py
-!ml_play_template_collect.py
+!ml_play_collect.py
 !ml_model_trainer.py
-!ml_play_template_collect_1024.py
+!ml_play_collect_1024.py
 cmd/
 .idea/
 # Byte-compiled / optimized / DLL files

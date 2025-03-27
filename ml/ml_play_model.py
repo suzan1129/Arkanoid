@@ -1,7 +1,7 @@
 import pickle
 import numpy as np
 import random
-from ml.ml_play_template_collect import predict_landing_point
+from ml.ml_play_collect import predict_landing_point
 
 # def predict_landing_point(scene_info, previous_ball_position):
 #     """
@@ -69,6 +69,11 @@ class MLPlay:
         if not scene_info["ball_served"]:
             # command = "SERVE_TO_LEFT"  # 自動發球
             command = "SERVE_TO_LEFT" if random.randint(0, 1) == 0 else "SERVE_TO_RIGHT" # 隨機發球
+            command = "MOVE_LEFT" if random.randint(0, 1) == 0 else "MOVE_RIGHT"  # 隨機移動
+            # if random.randint(0, 1) == 0:
+            #     command = "MOVE_LEFT"
+            # else:
+            #     command = "MOVE_RIGHT"
         else:   # 已發球
             ball_x = scene_info["ball"][0]
             ball_y = scene_info["ball"][1]
@@ -97,14 +102,14 @@ class MLPlay:
                 feature = np.array([ball_x, ball_y, platform_x, ball_dx, ball_dy, predicted_x]).reshape(1, -1)
 
                 """"確認特徵向量"""
-                print("Feature vector:", feature)  # 加入這行，印出特徵向量
+                # print("Feature vector:", feature)  # 加入這行，印出特徵向量
                 
                 
                 # print("Debug: 模型預測開始前") # <--- 加入這行
                 predicted_label = self.model.predict(feature)[0]
                 # print("Debug: 模型預測結束後, predicted_label =", predicted_label) # <--- 加入這行
 
-
+                # 預測的 label 對應的指令
                 if predicted_label == 0:
                     command = "MOVE_LEFT"
                 elif predicted_label == 1:
