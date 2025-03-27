@@ -44,8 +44,7 @@ class MLPlay:
             command = "NONE"
 
         # 只在發球後才開始記錄資料
-        if scene_info["ball_served"]:
-            # scene_info.pop("status")  # 移除無法序列化的資料
+        if scene_info["ball_served"]:  # 移除無法序列化的資料
             scene_info.pop("bricks")
             scene_info.pop("hard_bricks")
             scene_info.pop("frame")
@@ -72,7 +71,7 @@ class MLPlay:
         removed_status_databuffer = []
         for data in self.data_buffer:
             data_copy = data.copy()
-            data_copy["scene_info"].pop("status")
+            data_copy["scene_info"].pop("status") 
             removed_status_databuffer.append(data_copy)
         self.data_buffer = removed_status_databuffer
         print(self.data_buffer)
